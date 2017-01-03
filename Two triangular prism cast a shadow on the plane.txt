@@ -1,0 +1,95 @@
+import Blender as B
+import time
+import Blender
+import math
+from Blender.Mathutils import * #подключение модулей
+from Blender import Draw
+from Blender.BGL import *
+ob=B.Object.Get('Cylinder') объект цилиндр
+msh=ob.getData(False,True) #данные для цилиндра
+fs=msh.faces #данные для цилиндра
+cntEnd=30			#значение, при котором движение закончится
+cnt=0	#начальный счетчик движения
+buffP=Buffer(GL_FLOAT,4,[10,10,30,1.]) #позиция источника света
+def key(evt,val):
+	if evt==Draw.ESCKEY: Draw.Exit()
+def cngL():
+	global cnt,buffP
+	time.sleep(0.2) #задержка прорисовки
+	if cnt==cntEnd: Draw.Exit() 
+	cnt +=1; #прибавляем
+	buffP[0] +=1 # меняем координату источника света х
+	buffP[1] +=1 # меняем координату источника света у
+	Draw.Redraw(1) #перерисовка
+def createMatr(): #строим матрицу теней
+	glLightfv(GL_LIGHT0,GL_POSITION,buffP)  #устанавливаем позицию источ. света
+	glEnable(GL_LIGHT0) # вид освещения 0
+	spec=Buffer(GL_FLOAT,4,(0,0,0,1)) #ставим в 0 зеркальное освещение
+	glLightfv(GL_LIGHT0,GL_SPECULAR,spec) #вкючаем зеркальное освещение
+	mmat=Buffer(GL_FLOAT,16,[buffP[2],0, 0,0 , 0,buffP[2],0,0, -buffP[0],-buffP[1],0, -1,  0,0,0, buffP[2]]) #matr po stolbzam на z=0
+	glMultMatrixf(mmat) #umnozh matr na matr
+def prizma(): #функция рисования призмы
+	glPushMatrix() #кладем в стек матрицу координат
+	for ff in fs: #рисование сферы по точкам
+		if len(ff.verts)==4:
+			glColor3f(0,1,1) #цвет прямоугольников призмы
+			glBegin(GL_QUADS)
+			for pt in ff.verts:
+				glVertex3f(pt.co.x,pt.co.y,pt.co.z)
+			glEnd()
+		if len(ff.verts)==3:
+			glColor3f(1,0,0) #цвет треугольников призмы
+			glBegin(GL_TRIANGLES)
+			for pt in ff.verts:
+				glVertex3f(pt.co.x,pt.co.y,pt.co.z)
+			glEnd()
+	glPopMatrix() #берем из стека матрицу координат
+def prizma1(): #такая же функция рисования призмы только черным цветом(чтобы тень получилась)
+	glPushMatrix()
+	glColor3f(0,0,0)
+	for ff in fs:
+		if len(ff.verts)==4:
+			glBegin(GL_QUADS)
+			for pt in ff.verts:
+				glVertex3f(pt.co.x,pt.co.y,pt.co.z)
+			glEnd()
+		if len(ff.verts)==3:
+			glBegin(GL_TRIANGLES)
+			for pt in ff.verts:
+				glVertex3f(pt.co.x,pt.co.y,pt.co.z)
+			glEnd()
+	glPopMatrix()
+def gui():
+	glClearColor(1,1,0,1) #цвет фона
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+	glEnable(GL_DEPTH_TEST) #убираем невидимые поверхности
+	glEnable(GL_LIGHTING) #установка освещения
+	glCullFace(GL_BACK) #отключаем освещение невидимых сторон
+	glEnable(GL_CULL_FACE) #отключаем освещение невидимых сторон
+	glFrontFace(GL_CCW) #обход против часовой стрелки
+	glLightfv(GL_LIGHT0,GL_POSITION,buffP) #устанавливаем позици освещения
+	dif=Buffer(GL_FLOAT,4,(0.5,0.,0.,1)) #цвета для диффузного освещения
+	glLightfv(GL_LIGHT0,GL_DIFFUSE,dif) #включаем дифф освещение
+	amb=Buffer(GL_FLOAT,4,(0.5,0.5,0.5,1)) #цвета для фонового освещения
+	glLightfv(GL_LIGHT0,GL_AMBIENT,amb) #включаем фоновое освещение
+	glEnable(GL_COLOR_MATERIAL) #учитываем цвет объектов
+
+	glViewport(0,0,500,500) #область отображения объектов(х,y,высота,ширина)
+	glMatrixMode(GL_PROJECTION) #определяем матрицу проекции
+	glLoadIdentity() #единичная матрица
+	glOrtho(-6,6,-6,6,-200,200) #используем режим ortho
+	glRotatef(45,1,0,1) #поворот координат на 45 град
+
+	prizma() #рисование призмы
+	
+	glTranslatef(2,0,0) #сдвиг координат для рисования другой призмы
+	prizma() #рисование другой призмы
+	glTranslatef(0,-1,-2) #сдвиг для теней
+	createMatr() #строим матрицу теней
+	prizma1() #рисуем тень первой призмы
+	
+	glTranslatef(-2,0,0) #сдвиг координат для рисования тени другой призмы
+	createMatr() #строим матрицу теней второй призмы
+	prizma1() #рисуем тень второй призмы
+	cngL()	#вызываем функцию сдвига координат источника освещ		
+Draw.Register(gui,key,None)
